@@ -13,8 +13,12 @@ class PlotCanvas(FigureCanvasQTAgg):
         super().__init__(self.fig)
 
     def clear(self):
-        self.ax.clear()
+        self.fig.clear()
+        self.ax = self.fig.add_subplot(111)
 
     def refresh(self):
-        self.fig.tight_layout()
+        try:
+            self.fig.tight_layout()
+        except Exception:
+            pass
         self.draw()

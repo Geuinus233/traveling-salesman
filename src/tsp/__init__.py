@@ -12,7 +12,15 @@ from .algorithms import (
     solve_nn,
     solve_sa,
 )
-from .utils import format_tour, generate_cities, load_matrix_file, matrix_from_coords, tour_cost
+from .utils import (
+    format_tour,
+    generate_cities,
+    load_matrix_file,
+    matrix_from_coords,
+    tour_cost,
+    save_matrix_file,
+    random_matrix,
+)
 
 __all__ = [
     "BKTParams",
@@ -32,4 +40,6 @@ __all__ = [
     "solve_nn",
     "solve_sa",
     "tour_cost",
+    "save_matrix_file",
+    "random_matrix",
 ]

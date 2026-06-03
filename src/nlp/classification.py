@@ -1,4 +1,4 @@
-"""Parametrizable NLP text classification (Lab 10 style)."""
+"""Parametrizable NLP text classification with custom lexicon dictionaries."""
 
 from __future__ import annotations
 
@@ -11,10 +11,11 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.naive_bayes import MultinomialNB
-from sklearn.pipeline import Pipeline
+from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.svm import LinearSVC
 
 from .datasets import TextDataset
+from .dictionaries import DictionaryFeatureExtractor
 
 
 @dataclass
@@ -29,6 +30,7 @@ class NLPParams:
     lr_max_iter: int = 1000
     rf_n_estimators: int = 100
     random_state: int = 42
+    use_dictionaries: bool = False
 
 
 @dataclass
@@ -54,26 +56,32 @@ CLASSIFIERS = {
 }
 
 
-def build_pipeline(params: NLPParams) -> Pipeline:
-    return Pipeline(
-        [
-            (
-                "tfidf",
-                TfidfVectorizer(
-                    ngram_range=params.ngram_range,
-                    max_features=params.max_features,
-                    stop_words=params.stop_words,
-                    sublinear_tf=params.sublinear_tf,
-                ),
-            ),
-            ("clf", CLASSIFIERS[params.classifier](params)),
-        ]
+def build_pipeline(params: NLPParams, dictionaries: dict[str, list[str]] | None = None) -> Pipeline:
+    tfidf = TfidfVectorizer(
+        ngram_range=params.ngram_range,
+        max_features=params.max_features,
+        stop_words=params.stop_words,
+        sublinear_tf=params.sublinear_tf,
     )
+    if params.use_dictionaries:
+        combined = FeatureUnion(
+            [
+                ("tfidf", tfidf),
+                ("dict", DictionaryFeatureExtractor(dictionaries)),
+            ]
+        )
+        return Pipeline([("vec", combined), ("clf", CLASSIFIERS[params.classifier](params))])
+    else:
+        return Pipeline([("vec", tfidf), ("clf", CLASSIFIERS[params.classifier](params))])
 
 
-def evaluate(dataset: TextDataset, params: NLPParams | None = None) -> NLPResult:
+def evaluate(
+    dataset: TextDataset,
+    params: NLPParams | None = None,
+    dictionaries: dict[str, list[str]] | None = None,
+) -> NLPResult:
     params = params or NLPParams()
-    pipeline = build_pipeline(params)
+    pipeline = build_pipeline(params, dictionaries)
     t0 = time.perf_counter()
     pipeline.fit(dataset.train_texts, dataset.train_labels)
     train_time = time.perf_counter() - t0
@@ -97,6 +105,7 @@ def evaluate(dataset: TextDataset, params: NLPParams | None = None) -> NLPResult
 def compare_classifiers(
     dataset: TextDataset,
     base_params: NLPParams | None = None,
+    dictionaries: dict[str, list[str]] | None = None,
 ) -> list[NLPResult]:
     base = base_params or NLPParams()
     results = []
@@ -109,8 +118,9 @@ def compare_classifiers(
             sublinear_tf=base.sublinear_tf,
             svm_c=base.svm_c,
             random_state=base.random_state,
+            use_dictionaries=base.use_dictionaries,
         )
-        results.append(evaluate(dataset, p))
+        results.append(evaluate(dataset, p, dictionaries))
     return results
 
 
@@ -118,6 +128,7 @@ def study_ngram(
     dataset: TextDataset,
     ngrams: list[tuple[int, int]] | None = None,
     base: NLPParams | None = None,
+    dictionaries: dict[str, list[str]] | None = None,
 ) -> list[NLPResult]:
     base = base or NLPParams(classifier="LinearSVC")
     ngrams = ngrams or [(1, 1), (1, 2), (2, 2), (1, 3)]
@@ -128,8 +139,9 @@ def study_ngram(
             ngram_range=ng,
             max_features=base.max_features,
             stop_words=base.stop_words,
+            use_dictionaries=base.use_dictionaries,
         )
-        out.append(evaluate(dataset, p))
+        out.append(evaluate(dataset, p, dictionaries))
     return out
 
 
@@ -137,6 +149,7 @@ def study_max_features(
     dataset: TextDataset,
     values: list[int | None] | None = None,
     base: NLPParams | None = None,
+    dictionaries: dict[str, list[str]] | None = None,
 ) -> list[NLPResult]:
     base = base or NLPParams(classifier="LinearSVC")
     values = values or [500, 1000, 5000, 10000, None]
@@ -147,6 +160,7 @@ def study_max_features(
             ngram_range=base.ngram_range,
             max_features=mf,
             stop_words=base.stop_words,
+            use_dictionaries=base.use_dictionaries,
         )
-        out.append(evaluate(dataset, p))
+        out.append(evaluate(dataset, p, dictionaries))
     return out

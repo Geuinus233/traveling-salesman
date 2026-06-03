@@ -10,7 +10,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+import ssl
 from sklearn.datasets import fetch_20newsgroups
+
+try:
+    ssl._create_default_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
 
 CACHE_DIR = Path(__file__).resolve().parents[2] / "data" / "cache"
 
