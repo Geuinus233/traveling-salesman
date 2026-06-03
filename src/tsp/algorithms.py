@@ -161,11 +161,24 @@ def solve_hc(dist_matrix: list[list[float]], params: HCParams | None = None) -> 
     n = len(dist_matrix)
     start = time.perf_counter()
 
-    def steepest(path: list[int]) -> tuple[list[int], float]:
+    global_best_path: list[int] = list(range(n))
+    global_best_cost = math.inf
+    history: list[float] = []
+
+    for _ in range(max(1, params.restarts)):
+        path = list(range(n))
+        rng.shuffle(path)
         current = path[:]
         current_cost = tour_cost(current, dist_matrix)
+        
+        if current_cost < global_best_cost:
+            global_best_cost = current_cost
+            global_best_path = current[:]
+        history.append(global_best_cost)
+
         improved = True
-        while improved:
+        step_count = 0
+        while improved and step_count < (params.max_iterations // params.restarts):
             improved = False
             best_neighbor, best_cost = current, current_cost
             for i in range(n - 1):
@@ -177,22 +190,17 @@ def solve_hc(dist_matrix: list[list[float]], params: HCParams | None = None) -> 
                         best_neighbor, best_cost = neighbor, c
                         improved = True
             current, current_cost = best_neighbor, best_cost
-        return current, current_cost
-
-    global_best_path: list[int] = list(range(n))
-    global_best_cost = math.inf
-    for _ in range(max(1, params.restarts)):
-        path = list(range(n))
-        rng.shuffle(path)
-        p, c = steepest(path)
-        if c < global_best_cost:
-            global_best_path, global_best_cost = p, c
+            if current_cost < global_best_cost:
+                global_best_cost = current_cost
+                global_best_path = current[:]
+            step_count += 1
+            history.append(global_best_cost)
 
     return TSPResult(
         path=global_best_path,
         cost=global_best_cost,
         elapsed_s=time.perf_counter() - start,
-        meta={"restarts": params.restarts},
+        meta={"restarts": params.restarts, "history": history},
     )
 
 
@@ -207,8 +215,9 @@ def solve_sa(dist_matrix: list[list[float]], params: SAParams | None = None) -> 
     current_cost = tour_cost(current, dist_matrix)
     best, best_cost = current[:], current_cost
     temp = params.initial_temp
+    history: list[float] = []
 
-    for _ in range(params.max_iterations):
+    for idx in range(params.max_iterations):
         if temp < params.min_temp:
             break
         neighbor = _two_opt_neighbor(current, rng)
@@ -219,12 +228,14 @@ def solve_sa(dist_matrix: list[list[float]], params: SAParams | None = None) -> 
             if current_cost < best_cost:
                 best, best_cost = current[:], current_cost
         temp *= params.cooling_rate
+        if idx % max(1, params.max_iterations // 500) == 0:
+            history.append(best_cost)
 
     return TSPResult(
         path=best,
         cost=best_cost,
         elapsed_s=time.perf_counter() - start,
-        meta={"final_temp": temp},
+        meta={"final_temp": temp, "history": history},
     )
 
 

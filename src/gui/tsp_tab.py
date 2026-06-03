@@ -1,7 +1,10 @@
-"""TSP tab: algorithms, parameters, visualization."""
+"""TSP Tab: algorithms, parameters, visualization, benchmarking, and matrix saving."""
 
 from __future__ import annotations
 
+import math
+import os
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
@@ -16,6 +19,9 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QCheckBox,
     QTextEdit,
+    QLineEdit,
+    QTabWidget,
+    QScrollArea,
 )
 
 from src.gui.plot_canvas import PlotCanvas
@@ -31,7 +37,15 @@ from src.tsp.algorithms import (
     TSPResult,
 )
 from src.tsp.benchmarks import run_tsp_benchmark
-from src.tsp.utils import format_tour, generate_cities, load_matrix_file, matrix_from_coords, tour_cost
+from src.tsp.utils import (
+    format_tour,
+    generate_cities,
+    load_matrix_file,
+    matrix_from_coords,
+    save_matrix_file,
+    random_matrix,
+    tour_cost,
+)
 
 
 class TSPTab(QWidget):
@@ -45,60 +59,131 @@ class TSPTab(QWidget):
 
     def _build_ui(self):
         root = QHBoxLayout(self)
+        root.setContentsMargins(10, 10, 10, 10)
+        root.setSpacing(15)
 
-        controls = QVBoxLayout()
-        root.addLayout(controls, 0)
+        # Control Panel Scroll Area
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setFixedWidth(340)
 
-        form = QFormLayout()
+        scroll_content = QWidget()
+        controls = QVBoxLayout(scroll_content)
+        controls.setSpacing(10)
+        controls.setContentsMargins(0, 0, 5, 0)
+
+        # 1. Data Source & Generation Group
+        group_data = QGroupBox("Generare / Încărcare Date")
+        group_data_layout = QVBoxLayout(group_data)
+        form_data = QFormLayout()
+
         self.spin_n = QSpinBox()
-        self.spin_n.setRange(3, 80)
+        self.spin_n.setRange(3, 150)
         self.spin_n.setValue(10)
-        form.addRow("Number of cities:", self.spin_n)
+        form_data.addRow("Număr orașe (N):", self.spin_n)
 
         self.seed_spin = QSpinBox()
         self.seed_spin.setRange(0, 99999)
         self.seed_spin.setValue(42)
-        form.addRow("Random seed:", self.seed_spin)
-        controls.addLayout(form)
+        form_data.addRow("Seed aleator:", self.seed_spin)
+        group_data_layout.addLayout(form_data)
 
-        btn_row = QHBoxLayout()
-        self.btn_gen = QPushButton("Generate cities")
-        self.btn_load = QPushButton("Load matrix file…")
-        btn_row.addWidget(self.btn_gen)
-        btn_row.addWidget(self.btn_load)
-        controls.addLayout(btn_row)
+        # Generation buttons
+        btn_gen_row = QHBoxLayout()
+        self.btn_gen = QPushButton("Gen. Orașe (Euclidian)")
+        self.btn_gen_non_eucl = QPushButton("Gen. Non-Euclidian")
+        btn_gen_row.addWidget(self.btn_gen)
+        btn_gen_row.addWidget(self.btn_gen_non_eucl)
+        group_data_layout.addLayout(btn_gen_row)
+
+        # File I/O buttons
+        btn_file_row = QHBoxLayout()
+        self.btn_load = QPushButton("Încarcă Matrică")
+        self.btn_save = QPushButton("Salvează Matrică")
+        btn_file_row.addWidget(self.btn_load)
+        btn_file_row.addWidget(self.btn_save)
+        group_data_layout.addLayout(btn_file_row)
+
+        controls.addWidget(group_data)
+
+        # 2. Algorithm & Parameters
+        group_algo = QGroupBox("Configurare Algoritm")
+        group_algo_layout = QVBoxLayout(group_algo)
 
         self.algo_combo = QComboBox()
         self.algo_combo.addItems(list(SOLVERS.keys()))
-        controls.addWidget(QLabel("Algorithm:"))
-        controls.addWidget(self.algo_combo)
+        group_algo_layout.addWidget(QLabel("Algoritm selectat:"))
+        group_algo_layout.addWidget(self.algo_combo)
 
-        self.params_box = QGroupBox("Parameters")
+        self.params_box = QGroupBox("Parametri Personalizați")
         self.params_layout = QFormLayout(self.params_box)
-        controls.addWidget(self.params_box)
+        group_algo_layout.addWidget(self.params_box)
         self._param_widgets: dict[str, QWidget] = {}
         self.algo_combo.currentTextChanged.connect(self._rebuild_params)
         self._rebuild_params(self.algo_combo.currentText())
 
-        self.btn_run = QPushButton("Run algorithm")
-        self.btn_compare = QPushButton("Compare all algorithms")
-        self.btn_bench = QPushButton("Benchmark (time vs N)")
-        controls.addWidget(self.btn_run)
-        controls.addWidget(self.btn_compare)
-        controls.addWidget(self.btn_bench)
+        controls.addWidget(group_algo)
 
+        # 3. Execution & Complex Benchmarking
+        group_run = QGroupBox("Rulare și Experimente")
+        group_run_layout = QVBoxLayout(group_run)
+
+        run_btn_row = QHBoxLayout()
+        self.btn_run = QPushButton("Rulare Algoritm")
+        self.btn_compare = QPushButton("Compară Algoritmi")
+        run_btn_row.addWidget(self.btn_run)
+        run_btn_row.addWidget(self.btn_compare)
+        group_run_layout.addLayout(run_btn_row)
+
+        # Benchmark Settings
+        bench_form = QFormLayout()
+        self.line_sizes = QLineEdit("5, 10, 15, 20, 30, 50")
+        bench_form.addRow("Dimensiuni N:", self.line_sizes)
+
+        self.spin_repeats = QSpinBox()
+        self.spin_repeats.setRange(1, 10)
+        self.spin_repeats.setValue(3)
+        bench_form.addRow("Repetări per N:", self.spin_repeats)
+        group_run_layout.addLayout(bench_form)
+
+        self.btn_bench = QPushButton("Rulare Benchmark Complexe")
+        group_run_layout.addWidget(self.btn_bench)
+        controls.addWidget(group_run)
+
+        # 4. Outputs
         self.result_text = QTextEdit()
         self.result_text.setReadOnly(True)
         self.result_text.setMaximumHeight(140)
-        controls.addWidget(QLabel("Results:"))
+        self.result_text.setStyleSheet("font-family: Consolas, monospace; font-size: 11px;")
+        controls.addWidget(QLabel("Rezultate Consolă:"))
         controls.addWidget(self.result_text)
         controls.addStretch()
 
-        self.canvas = PlotCanvas()
-        root.addWidget(self.canvas, 1)
+        scroll.setWidget(scroll_content)
+        root.addWidget(scroll, 0)
 
+        # Visualization Tabs (Right side)
+        self.viz_tabs = QTabWidget()
+        
+        self.canvas_map = PlotCanvas()
+        self.canvas_conv = PlotCanvas()
+        self.canvas_comp = PlotCanvas()
+        self.canvas_bench = PlotCanvas()
+
+        self.viz_tabs.addTab(self.canvas_map, "🗺️ Hartă și Rute")
+        self.viz_tabs.addTab(self.canvas_conv, "📈 Convergență")
+        self.viz_tabs.addTab(self.canvas_comp, "📊 Comparare Cost & Timp")
+        self.viz_tabs.addTab(self.canvas_bench, "🔬 Benchmark-uri Complexe")
+
+        root.addWidget(self.viz_tabs, 1)
+
+        # Event connections
         self.btn_gen.clicked.connect(self._generate_cities)
+        self.btn_gen_non_eucl.clicked.connect(self._generate_non_euclidian)
         self.btn_load.clicked.connect(self._load_file)
+        self.btn_save.clicked.connect(self._save_file)
         self.btn_run.clicked.connect(self._run_single)
         self.btn_compare.clicked.connect(self._run_compare)
         self.btn_bench.clicked.connect(self._run_benchmark)
@@ -115,7 +200,7 @@ class TSPTab(QWidget):
             self._add_spin("y_solutions", 1, 1000, 5)
             self._add_float("time_limit_s", 1.0, 600.0, 30.0, 1)
         elif algo == "NN":
-            self._add_spin("start", 0, 100, 0)
+            self._add_spin("start", 0, 150, 0)
             self._add_check("multistart", False)
         elif algo == "HC":
             self._add_spin("max_iterations", 100, 100000, 5000)
@@ -199,41 +284,72 @@ class TSPTab(QWidget):
         n = self.spin_n.value()
         self.cities = generate_cities(n, seed=self.seed_spin.value())
         self.dist_matrix = matrix_from_coords(self.cities)
-        self._draw_path([], "Cities generated")
-        self.result_text.setPlainText(f"Generated {n} cities.")
+        self._draw_path([], "Orașe generate (Euclidian)")
+        self.result_text.setPlainText(f"Generate {n} orașe în coordonate 2D (Euclidian).")
+
+    def _generate_non_euclidian(self):
+        n = self.spin_n.value()
+        self.dist_matrix = random_matrix(n, seed=self.seed_spin.value())
+        self._layout_cities_circle(n)
+        self._draw_path([], f"Generat matrică non-Euclidiană N={n}")
+        self.result_text.setPlainText(
+            f"Generat matrică non-Euclidiană de dimensiune {n}x{n}.\n"
+            "Notă: Orașele sunt dispuse circular pentru vizualizare."
+        )
+
+    def _layout_cities_circle(self, n: int):
+        self.cities = []
+        for i in range(n):
+            angle = 2.0 * math.pi * i / n
+            self.cities.append((400.0 + 220.0 * math.cos(angle), 300.0 + 220.0 * math.sin(angle)))
 
     def _load_file(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Open TSP matrix", "", "Text (*.txt);;All (*)")
+        path, _ = QFileDialog.getOpenFileName(self, "Deschide matrică TSP", "", "Text (*.txt);;All (*)")
         if not path:
             return
         n, matrix = load_matrix_file(path)
         self.dist_matrix = matrix
-        self.cities = [(float(i), 0.0) for i in range(n)]
+        self._layout_cities_circle(n)
         self.spin_n.setValue(n)
-        self._draw_path([], f"Loaded matrix N={n}")
-        self.result_text.setPlainText(f"Loaded {path}")
+        self._draw_path([], f"Încărcat matrică N={n}")
+        self.result_text.setPlainText(f"Încărcat fișierul: {path}\nDimensiune N={n}.")
+
+    def _save_file(self):
+        if not self.dist_matrix:
+            self.result_text.setPlainText("Nu există nicio matrică de salvat!")
+            return
+        path, _ = QFileDialog.getSaveFileName(self, "Salvează matrică TSP", "", "Text (*.txt);;All (*)")
+        if not path:
+            return
+        save_matrix_file(path, self.dist_matrix)
+        self.result_text.setPlainText(f"Salvare finalizată cu succes la:\n{path}")
 
     def _draw_path(self, path: list[int], title: str):
-        self.canvas.clear()
-        ax = self.canvas.ax
+        self.canvas_map.clear()
+        ax = self.canvas_map.ax
         if self.cities:
             xs = [c[0] for c in self.cities]
             ys = [c[1] for c in self.cities]
-            ax.scatter(xs, ys, c="crimson", s=40, zorder=3)
+            ax.scatter(xs, ys, c="crimson", s=45, zorder=3)
             for i, (x, y) in enumerate(self.cities):
-                ax.annotate(str(i), (x, y), fontsize=8, xytext=(3, 3), textcoords="offset points")
+                ax.annotate(str(i), (x, y), fontsize=9, fontweight="bold", xytext=(4, 4), textcoords="offset points")
         if path:
             px = [self.cities[i][0] for i in path] + [self.cities[path[0]][0]]
             py = [self.cities[i][1] for i in path] + [self.cities[path[0]][1]]
-            ax.plot(px, py, "b-", linewidth=1.5, zorder=2)
+            ax.plot(px, py, "b-", linewidth=2.0, zorder=2)
         ax.set_title(title)
         ax.set_aspect("equal", adjustable="datalim")
-        self.canvas.refresh()
+        self.canvas_map.refresh()
+        self.viz_tabs.setCurrentIndex(0)  # Switch to Map Tab
 
     def _set_busy(self, busy: bool):
         self.btn_run.setEnabled(not busy)
         self.btn_compare.setEnabled(not busy)
         self.btn_bench.setEnabled(not busy)
+        self.btn_gen.setEnabled(not busy)
+        self.btn_gen_non_eucl.setEnabled(not busy)
+        self.btn_load.setEnabled(not busy)
+        self.btn_save.setEnabled(not busy)
 
     def _run_async(self, fn, on_ok):
         if self._worker and self._worker.isRunning():
@@ -246,14 +362,14 @@ class TSPTab(QWidget):
         self._worker.start()
 
     def _on_error(self, msg: str):
-        self.result_text.setPlainText(f"Error: {msg}")
+        self.result_text.setPlainText(f"Eroare: {msg}")
 
     def _run_single(self):
         if not self.dist_matrix:
             return
         algo = self.algo_combo.currentText()
         if algo == "BKT" and len(self.dist_matrix) > 12:
-            self.result_text.setPlainText("BKT is limited to N ≤ 12 in the GUI.")
+            self.result_text.setPlainText("BKT este limitat la N ≤ 12 în interfața grafică.")
             return
         params = self._current_params(algo)
         matrix = self.dist_matrix
@@ -270,15 +386,28 @@ class TSPTab(QWidget):
     def _show_result(self, algo: str, result: TSPResult):
         machine = get_machine_info().as_text()
         text = (
-            f"Algorithm: {algo}\n"
+            f"Algoritm: {algo}\n"
             f"Cost: {result.cost:.4f}\n"
-            f"Time: {result.elapsed_s:.4f} s\n"
-            f"Tour: {format_tour(result.path)}\n"
+            f"Timp: {result.elapsed_s:.5f} s\n"
+            f"Ruta: {format_tour(result.path)}\n"
             f"Meta: {result.meta}\n\n"
-            f"--- Machine ---\n{machine}"
+            f"--- Dispozitiv ---\n{machine}"
         )
         self.result_text.setPlainText(text)
         self._draw_path(result.path, f"{algo} — cost {result.cost:.2f}")
+
+        # Draw convergence plot if history is available (SA, GA, HC)
+        history = result.meta.get("history")
+        if history:
+            self.canvas_conv.clear()
+            ax = self.canvas_conv.ax
+            ax.plot(range(len(history)), history, color="crimson", linewidth=2.0, label="Cost curent")
+            ax.set_title(f"Convergența Istorică - {algo}")
+            ax.set_xlabel("Eșantion Iterații / Generații")
+            ax.set_ylabel("Cel mai bun cost")
+            ax.grid(True, linestyle="--", alpha=0.5)
+            ax.legend()
+            self.canvas_conv.refresh()
 
     def _run_compare(self):
         if not self.dist_matrix:
@@ -301,53 +430,113 @@ class TSPTab(QWidget):
             return rows
 
         def done(rows):
-            self.canvas.clear()
-            ax = self.canvas.ax
+            self.canvas_comp.clear()
+            fig = self.canvas_comp.fig
+            fig.clear()
+            
             names = [a for a, _ in rows]
             costs = [r.cost for _, r in rows]
             times = [r.elapsed_s for _, r in rows]
-            x = range(len(names))
-            ax2 = ax.twinx()
-            ax.bar([i - 0.2 for i in x], costs, width=0.4, label="Cost", color="steelblue")
-            ax2.bar([i + 0.2 for i in x], times, width=0.4, label="Time (s)", color="coral")
-            ax.set_xticks(list(x))
-            ax.set_xticklabels(names)
-            ax.set_ylabel("Tour cost")
-            ax2.set_ylabel("Time (s)")
-            ax.set_title("Algorithm comparison")
-            self.canvas.fig.legend(loc="upper right")
-            self.canvas.refresh()
 
-            lines = [f"{a}: cost={r.cost:.2f}, time={r.elapsed_s:.4f}s" for a, r in rows]
+            # 1. Bar plot on the left (Costs)
+            ax1 = fig.add_subplot(121)
+            x = range(len(names))
+            ax1.bar(x, costs, color="steelblue", alpha=0.8, edgecolor="black", width=0.5)
+            ax1.set_xticks(list(x))
+            ax1.set_xticklabels(names, rotation=25)
+            ax1.set_ylabel("Costul Turului (Valoare)")
+            ax1.set_title("Calitate Soluție (Cost)")
+            ax1.grid(True, linestyle="--", alpha=0.3)
+
+            # Add labels above bars
+            for i, c in enumerate(costs):
+                ax1.text(i, c + (max(costs) * 0.01), f"{c:.1f}", ha="center", fontsize=8, fontweight="bold")
+
+            # 2. Performance (Cost vs Time scatter plot) on the right
+            ax2 = fig.add_subplot(122)
+            for name, c, t in zip(names, costs, times):
+                ax2.scatter(t, c, s=180, label=name, marker="o", edgecolors="black", alpha=0.95)
+            ax2.set_xlabel("Timp Execuție (s)")
+            ax2.set_ylabel("Cost")
+            ax2.set_title("Eficiență: Cost vs Timp")
+            ax2.legend(loc="best")
+            ax2.grid(True, linestyle="--", alpha=0.5)
+
+            self.canvas_comp.refresh()
+            self.viz_tabs.setCurrentIndex(2)  # Switch to Comparison Tab
+
+            lines = [f"{a}: cost={r.cost:.2f}, timp={r.elapsed_s:.5f}s" for a, r in rows]
             lines.append("\n" + get_machine_info().as_text())
             self.result_text.setPlainText("\n".join(lines))
             best = min(rows, key=lambda t: t[1].cost)
-            self._draw_path(best[1].path, f"Best: {best[0]}")
+            self._draw_path(best[1].path, f"Cel mai bun: {best[0]}")
 
         self._run_async(job, done)
 
     def _run_benchmark(self):
+        try:
+            # Parse sizes e.g. "5,10,15,20,30,50"
+            sizes = [int(s.strip()) for s in self.line_sizes.text().split(",") if s.strip()]
+        except Exception:
+            self.result_text.setPlainText("Format dimensiuni invalid! Folosește valori separate prin virgulă.")
+            return
+
+        repeats = self.spin_repeats.value()
+        seed = self.seed_spin.value()
+
         def job():
-            return run_tsp_benchmark(sizes=[5, 7, 8, 10, 12, 15, 20], repeats=1, seed=self.seed_spin.value())
+            return run_tsp_benchmark(sizes=sizes, repeats=repeats, seed=seed)
 
         def done(rows):
-            self.canvas.clear()
-            ax = self.canvas.ax
+            self.canvas_bench.clear()
+            fig = self.canvas_bench.fig
+            fig.clear()
+
+            ax1 = fig.add_subplot(121)
+            ax2 = fig.add_subplot(122)
+
             algos = sorted({r.algorithm for r in rows})
             for algo in algos:
                 subset = [r for r in rows if r.algorithm == algo]
+                subset.sort(key=lambda r: r.n)
                 ns = [r.n for r in subset]
-                ts = [r.time_s for r in subset]
-                ax.plot(ns, ts, marker="o", label=algo)
-            ax.set_xlabel("N (cities)")
-            ax.set_ylabel("Time (s)")
-            ax.set_yscale("log")
-            ax.set_title("Runtime vs problem size")
-            ax.legend()
-            self.canvas.refresh()
-            self.result_text.setPlainText(
-                f"Benchmark on {get_machine_info().hostname}\n"
-                + "\n".join(f"N={r.n} {r.algorithm}: cost={r.cost:.1f} t={r.time_s:.4f}s" for r in rows)
-            )
+
+                cost_means = [r.cost_mean for r in subset]
+                cost_stds = [r.cost_std for r in subset]
+                time_means = [r.time_mean for r in subset]
+                time_stds = [r.time_std for r in subset]
+
+                # Execution Time vs N (Log scale)
+                ax1.errorbar(ns, time_means, yerr=time_stds, fmt="-o", capsize=4, label=algo, linewidth=1.8)
+                # Cost vs N
+                ax2.errorbar(ns, cost_means, yerr=cost_stds, fmt="-s", capsize=4, label=algo, linewidth=1.8)
+
+            ax1.set_xlabel("Dimensiune Problemă N (Orașe)")
+            ax1.set_ylabel("Timp mediu de rulare (s)")
+            ax1.set_yscale("log")
+            ax1.set_title("Timp Mediu vs N (Scală Log)")
+            ax1.legend(loc="upper left")
+            ax1.grid(True, linestyle="--", alpha=0.5)
+
+            ax2.set_xlabel("Dimensiune Problemă N (Orașe)")
+            ax2.set_ylabel("Cost Mediu Soluție")
+            ax2.set_title("Performanță Cost Mediu vs N")
+            ax2.legend(loc="upper left")
+            ax2.grid(True, linestyle="--", alpha=0.5)
+
+            self.canvas_bench.refresh()
+            self.viz_tabs.setCurrentIndex(3)  # Switch to Benchmark Tab
+
+            console_output = [
+                f"Benchmark finalizat pe {get_machine_info().hostname} (repetări={repeats}):",
+                "-" * 65,
+                f"{'Algoritm':<12} {'N':<6} {'Cost Mediu':<12} {'Timp Mediu (s)':<14}",
+                "-" * 65
+            ]
+            for r in rows:
+                console_output.append(
+                    f"{r.algorithm:<12} {r.n:<6} {r.cost_mean:<12.2f} {r.time_mean:<14.5f}"
+                )
+            self.result_text.setPlainText("\n".join(console_output))
 
         self._run_async(job, done)

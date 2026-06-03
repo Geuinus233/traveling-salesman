@@ -1,7 +1,8 @@
-"""NLP tab: datasets, classifiers, comparisons."""
+"""NLP Tab: datasets, classifiers, custom dictionaries editor, and visualization."""
 
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QFormLayout,
@@ -13,12 +14,15 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QTextEdit,
+    QCheckBox,
+    QScrollArea,
 )
 
 from src.gui.plot_canvas import PlotCanvas
 from src.gui.workers import WorkerThread
 from src.nlp.classification import CLASSIFIERS, NLPParams, compare_classifiers, evaluate, study_max_features, study_ngram
 from src.nlp.datasets import DATASET_LABELS, TextDataset, load_dataset
+from src.nlp.dictionaries import DEFAULT_DICTIONARIES
 from src.system_info import get_machine_info
 
 
@@ -26,36 +30,50 @@ class NLPTab(QWidget):
     def __init__(self):
         super().__init__()
         self.dataset: TextDataset | None = None
+        self.dictionaries = {name: list(words) for name, words in DEFAULT_DICTIONARIES.items()}
         self._worker: WorkerThread | None = None
         self._build_ui()
 
     def _build_ui(self):
         root = QHBoxLayout(self)
-        left = QVBoxLayout()
-        root.addLayout(left, 0)
+        root.setContentsMargins(10, 10, 10, 10)
+        root.setSpacing(15)
 
+        # Control Panel Scroll Area
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setFixedWidth(340)
+
+        scroll_content = QWidget()
+        left = QVBoxLayout(scroll_content)
+        left.setSpacing(8)
+        left.setContentsMargins(0, 0, 5, 0)
+
+        # Group 1: Dataset Loader
+        group_dataset = QGroupBox("Incarcare Date")
+        group_dataset_layout = QVBoxLayout(group_dataset)
         self.dataset_combo = QComboBox()
         for key, label in DATASET_LABELS.items():
             self.dataset_combo.addItem(label, key)
-        left.addWidget(QLabel("Dataset (English):"))
-        left.addWidget(self.dataset_combo)
+        group_dataset_layout.addWidget(QLabel("Selecteaza Set de date:"))
+        group_dataset_layout.addWidget(self.dataset_combo)
+        self.btn_load = QPushButton("Incarca Set Date")
+        group_dataset_layout.addWidget(self.btn_load)
+        
+        self.info_label = QLabel("Niciun set de date incarcat.")
+        self.info_label.setWordWrap(True)
+        self.info_label.setStyleSheet("color: #475569; font-weight: 500;")
+        group_dataset_layout.addWidget(self.info_label)
+        left.addWidget(group_dataset)
 
-        self.btn_load = QPushButton("Load dataset")
-        self.btn_train = QPushButton("Train & evaluate")
-        self.btn_compare = QPushButton("Compare classifiers")
-        self.btn_ngram = QPushButton("Study ngram_range")
-        self.btn_features = QPushButton("Study max_features")
-        left.addWidget(self.btn_load)
-        left.addWidget(self.btn_train)
-        left.addWidget(self.btn_compare)
-        left.addWidget(self.btn_ngram)
-        left.addWidget(self.btn_features)
-
-        params_box = QGroupBox("Pipeline parameters")
-        form = QFormLayout(params_box)
+        # Group 2: Pipeline Parameters
+        group_params = QGroupBox("Parametri Pipeline")
+        form = QFormLayout(group_params)
         self.clf_combo = QComboBox()
         self.clf_combo.addItems(list(CLASSIFIERS.keys()))
-        form.addRow("Classifier:", self.clf_combo)
+        form.addRow("Clasificator:", self.clf_combo)
 
         self.ngram1 = QSpinBox()
         self.ngram1.setRange(1, 3)
@@ -71,28 +89,96 @@ class NLPTab(QWidget):
 
         self.max_feat = QSpinBox()
         self.max_feat.setRange(0, 200000)
-        self.max_feat.setSpecialValueText("all")
+        self.max_feat.setSpecialValueText("toate (all)")
         self.max_feat.setValue(10000)
-        form.addRow("max_features (0=all):", self.max_feat)
-        left.addWidget(params_box)
+        form.addRow("max_features:", self.max_feat)
 
-        self.info_label = QLabel("No dataset loaded.")
-        self.info_label.setWordWrap(True)
-        left.addWidget(self.info_label)
+        # Dictionary Feature Union toggle checkbox
+        self.chk_use_dict = QCheckBox("Utilizeaza Dictionare (Lexicoane)")
+        self.chk_use_dict.setChecked(False)
+        form.addRow(self.chk_use_dict)
+        left.addWidget(group_params)
 
+        # Group 3: Dictionaries Real-time Editor
+        group_dict = QGroupBox("Editor Dictionare NLP")
+        group_dict_layout = QVBoxLayout(group_dict)
+
+        self.dict_edit_combo = QComboBox()
+        self.dict_edit_combo.addItems(list(self.dictionaries.keys()))
+        group_dict_layout.addWidget(QLabel("Alege dictionarul de editat:"))
+        group_dict_layout.addWidget(self.dict_edit_combo)
+
+        self.dict_edit_text = QTextEdit()
+        self.dict_edit_text.setMaximumHeight(100)
+        self.dict_edit_text.setStyleSheet("font-family: Consolas, monospace; font-size: 11px;")
+        group_dict_layout.addWidget(QLabel("Cuvinte (unul pe linie):"))
+        group_dict_layout.addWidget(self.dict_edit_text)
+
+        self.btn_save_dict = QPushButton("Salveaza Cuvinte Dictionar")
+        group_dict_layout.addWidget(self.btn_save_dict)
+        left.addWidget(group_dict)
+
+        # Group 4: Training & Evaluation Actions
+        group_actions = QGroupBox("Rulare Experimente")
+        actions_layout = QVBoxLayout(group_actions)
+
+        row1 = QHBoxLayout()
+        self.btn_train = QPushButton("Antreneaza & Evalueaza")
+        self.btn_compare = QPushButton("Compara Clasificatori")
+        row1.addWidget(self.btn_train)
+        row1.addWidget(self.btn_compare)
+        actions_layout.addLayout(row1)
+
+        row2 = QHBoxLayout()
+        self.btn_ngram = QPushButton("Studiu ngram_range")
+        self.btn_features = QPushButton("Studiu max_features")
+        row2.addWidget(self.btn_ngram)
+        row2.addWidget(self.btn_features)
+        actions_layout.addLayout(row2)
+        left.addWidget(group_actions)
+
+        # Output text report
         self.report = QTextEdit()
         self.report.setReadOnly(True)
+        self.report.setMaximumHeight(160)
+        self.report.setStyleSheet("font-family: Consolas, monospace; font-size: 11px;")
+        left.addWidget(QLabel("Raport Rezultate:"))
         left.addWidget(self.report)
+
         left.addStretch()
 
+        scroll.setWidget(scroll_content)
+        root.addWidget(scroll, 0)
+
+        # Matplotlib visualization (Right side)
         self.canvas = PlotCanvas()
         root.addWidget(self.canvas, 1)
 
+        # Event connections
         self.btn_load.clicked.connect(self._load_dataset)
         self.btn_train.clicked.connect(self._train)
         self.btn_compare.clicked.connect(self._compare)
         self.btn_ngram.clicked.connect(self._study_ngram)
         self.btn_features.clicked.connect(self._study_features)
+        self.dict_edit_combo.currentTextChanged.connect(self._load_dict_words)
+        self.btn_save_dict.clicked.connect(self._save_dict_words)
+
+        # Load initial dictionary words for the first dictionary
+        self._load_dict_words(self.dict_edit_combo.currentText())
+
+    def _load_dict_words(self, dict_name: str):
+        if dict_name in self.dictionaries:
+            self.dict_edit_text.setPlainText("\n".join(self.dictionaries[dict_name]))
+
+    def _save_dict_words(self):
+        dict_name = self.dict_edit_combo.currentText()
+        if dict_name in self.dictionaries:
+            text = self.dict_edit_text.toPlainText()
+            words = [w.strip() for w in text.splitlines() if w.strip()]
+            self.dictionaries[dict_name] = words
+            self.report.setPlainText(
+                f"Modificari salvate! Dictionarul '{dict_name}' are acum {len(words)} cuvinte."
+            )
 
     def _params(self) -> NLPParams:
         mf = self.max_feat.value()
@@ -100,10 +186,18 @@ class NLPTab(QWidget):
             classifier=self.clf_combo.currentText(),
             ngram_range=(self.ngram1.value(), self.ngram2.value()),
             max_features=None if mf == 0 else mf,
+            use_dictionaries=self.chk_use_dict.isChecked(),
         )
 
     def _set_busy(self, busy: bool):
-        for btn in (self.btn_load, self.btn_train, self.btn_compare, self.btn_ngram, self.btn_features):
+        for btn in (
+            self.btn_load,
+            self.btn_train,
+            self.btn_compare,
+            self.btn_ngram,
+            self.btn_features,
+            self.btn_save_dict,
+        ):
             btn.setEnabled(not busy)
 
     def _run_async(self, fn, on_ok):
@@ -112,12 +206,15 @@ class NLPTab(QWidget):
         self._set_busy(True)
         self._worker = WorkerThread(fn)
         self._worker.finished_ok.connect(on_ok)
-        self._worker.failed.connect(lambda m: self.report.setPlainText(f"Error: {m}"))
+        self._worker.failed.connect(lambda m: self.report.setPlainText(f"Eroare: {m}"))
         self._worker.finished.connect(lambda: self._set_busy(False))
         self._worker.start()
 
     def _load_dataset(self):
         key = self.dataset_combo.currentData()
+        name = self.dataset_combo.currentText()
+        self.info_label.setText(f"Se descarcă / se încarcă:\n{name}...\nVă rugăm așteptați (poate dura)...")
+        self.report.setPlainText(f"Descărcare și procesare set de date '{name}' în curs de desfășurare. Vă rugăm așteptați...")
 
         def job():
             return load_dataset(key)
@@ -125,92 +222,109 @@ class NLPTab(QWidget):
         def done(ds: TextDataset):
             self.dataset = ds
             self.info_label.setText(
-                f"{ds.name}\n{ds.description}\nTrain: {ds.n_train} | Test: {ds.n_test}\n"
-                f"Classes: {', '.join(ds.target_names)}"
+                f"Set date incarcat: {ds.name}\n"
+                f"Train: {ds.n_train} | Test: {ds.n_test}\n"
+                f"Clase: {', '.join(ds.target_names)}"
             )
-            self.report.setPlainText("Dataset loaded. Run training or a study.")
+            self.report.setPlainText(f"Succes! Datele pentru {ds.name} au fost incarcate.")
 
         self._run_async(job, done)
 
     def _train(self):
         if not self.dataset:
-            self.report.setPlainText("Load a dataset first.")
+            self.report.setPlainText("Incarcati un set de date mai intai.")
             return
         ds, params = self.dataset, self._params()
+        dicts = self.dictionaries
+        self.report.setPlainText(f"Antrenare în curs pentru clasificatorul '{params.classifier}'... Vă rugăm așteptați...")
 
         def job():
-            return evaluate(ds, params)
+            return evaluate(ds, params, dicts)
 
         def done(res):
             self.report.setPlainText(
-                f"Accuracy: {res.accuracy:.4f}\nTrain time: {res.train_time_s:.2f} s\n\n"
-                f"{res.report}\n\n--- Machine ---\n{get_machine_info().as_text()}"
+                f"Acuratete: {res.accuracy:.4f}\n"
+                f"Timp antrenare: {res.train_time_s:.2f} s\n"
+                f"Foloseste Dictionare: {params.use_dictionaries}\n\n"
+                f"{res.report}\n\n"
+                f"--- Dispozitiv ---\n{get_machine_info().as_text()}"
             )
-            self._plot_confusion(res.confusion, ds.target_names, f"{params.classifier} — acc {res.accuracy:.3f}")
+            self._plot_confusion(
+                res.confusion, ds.target_names, f"{params.classifier} — acc {res.accuracy:.3f}"
+            )
 
         self._run_async(job, done)
 
     def _compare(self):
         if not self.dataset:
+            self.report.setPlainText("Incarcati un set de date mai intai.")
             return
         ds = self.dataset
         base = self._params()
+        dicts = self.dictionaries
+        self.report.setPlainText("Comparare clasificatori în curs de desfășurare... Vă rugăm așteptați (poate dura câteva zeci de secunde)...")
 
         def job():
-            return compare_classifiers(ds, base)
+            return compare_classifiers(ds, base, dicts)
 
         def done(results):
             names = [r.params.classifier for r in results]
             accs = [r.accuracy for r in results]
-            self._plot_bars(names, accs, "Classifier comparison", "Accuracy")
+            self._plot_bars(names, accs, "Comparatie Clasificatori", "Clasificator")
             lines = [
-                f"{r.params.classifier}: acc={r.accuracy:.4f}, time={r.train_time_s:.2f}s"
+                f"{r.params.classifier}: acc={r.accuracy:.4f}, timp={r.train_time_s:.2f}s"
                 for r in results
             ]
             best = max(results, key=lambda r: r.accuracy)
-            lines.append(f"\nBest: {best.params.classifier}")
+            lines.append(f"\nCel mai bun: {best.params.classifier}")
+            lines.append(f"Foloseste Dictionare: {base.use_dictionaries}")
             lines.append(get_machine_info().as_text())
             self.report.setPlainText("\n".join(lines))
-            self._plot_confusion(
-                best.confusion, ds.target_names, f"Best — {best.params.classifier}"
-            )
 
         self._run_async(job, done)
 
     def _study_ngram(self):
         if not self.dataset:
+            self.report.setPlainText("Incarcati un set de date mai intai.")
             return
         ds = self.dataset
         base = self._params()
+        dicts = self.dictionaries
+        self.report.setPlainText(f"Studiu ngram_range în curs pentru {base.classifier}... Vă rugăm așteptați...")
 
         def job():
-            return study_ngram(ds, base=base)
+            return study_ngram(ds, base=base, dictionaries=dicts)
 
         def done(results):
             labels = [str(r.params.ngram_range) for r in results]
             accs = [r.accuracy for r in results]
-            self._plot_bars(labels, accs, "ngram_range study (SVM)", "ngram_range")
+            self._plot_bars(labels, accs, f"Studiu ngram_range ({base.classifier})", "ngram_range")
             self.report.setPlainText(
-                "\n".join(f"ngram={r.params.ngram_range}: {r.accuracy:.4f}" for r in results)
+                f"Studiu ngram_range (Foloseste Dictionare: {base.use_dictionaries}):\n"
+                + "\n".join(f"ngram={r.params.ngram_range}: {r.accuracy:.4f}" for r in results)
             )
 
         self._run_async(job, done)
 
     def _study_features(self):
         if not self.dataset:
+            self.report.setPlainText("Incarcati un set de date mai intai.")
             return
         ds = self.dataset
         base = self._params()
+        dicts = self.dictionaries
+        self.report.setPlainText(f"Studiu max_features în curs pentru {base.classifier}... Vă rugăm așteptați...")
 
         def job():
-            return study_max_features(ds, base=base)
+            return study_max_features(ds, base=base, dictionaries=dicts)
 
         def done(results):
             labels = [str(r.params.max_features or "all") for r in results]
             accs = [r.accuracy for r in results]
-            self._plot_bars(labels, accs, "max_features study", "max_features")
+            self._plot_bars(labels, accs, f"Studiu max_features ({base.classifier})", "max_features")
             self.report.setPlainText(
-                "\n".join(f"max_features={r.params.max_features}: {r.accuracy:.4f}" for r in results)
+                f"Studiu max_features (Foloseste Dictionare: {base.use_dictionaries}):\n"
+                + "\n".join(f"max_features={r.params.max_features}: {r.accuracy:.4f}" for r in results)
             )
 
         self._run_async(job, done)
@@ -218,14 +332,15 @@ class NLPTab(QWidget):
     def _plot_bars(self, labels: list[str], values: list[float], title: str, xlabel: str):
         self.canvas.clear()
         ax = self.canvas.ax
-        ax.bar(labels, values, color="steelblue", edgecolor="black")
+        ax.bar(labels, values, color="steelblue", edgecolor="black", width=0.4)
         ax.set_ylim(0, 1.05)
-        ax.set_ylabel("Accuracy")
+        ax.set_ylabel("Acuratete")
         ax.set_xlabel(xlabel)
         ax.set_title(title)
         for i, v in enumerate(values):
-            ax.text(i, v + 0.01, f"{v:.3f}", ha="center", fontsize=9)
+            ax.text(i, v + 0.01, f"{v:.3f}", ha="center", fontsize=9, fontweight="bold")
         ax.tick_params(axis="x", rotation=25)
+        ax.grid(True, linestyle="--", alpha=0.3)
         self.canvas.refresh()
 
     def _plot_confusion(self, cm, labels: list[str], title: str):
@@ -237,10 +352,10 @@ class NLPTab(QWidget):
         ax.set_yticks(range(len(labels)))
         ax.set_xticklabels(labels, rotation=35, ha="right")
         ax.set_yticklabels(labels)
-        ax.set_xlabel("Predicted")
-        ax.set_ylabel("True")
+        ax.set_xlabel("Prezis")
+        ax.set_ylabel("Real")
         ax.set_title(title)
         for i in range(cm.shape[0]):
             for j in range(cm.shape[1]):
-                ax.text(j, i, str(cm[i, j]), ha="center", va="center", fontsize=8)
+                ax.text(j, i, str(cm[i, j]), ha="center", va="center", fontsize=9, fontweight="bold")
         self.canvas.refresh()

@@ -66,3 +66,11 @@ def format_tour(path: list[int]) -> str:
     if not path:
         return ""
     return " -> ".join(map(str, path)) + f" -> {path[0]}"
+
+
+def save_matrix_file(path: str | Path, matrix: list[list[float]]) -> None:
+    n = len(matrix)
+    lines = [str(n)]
+    for row in matrix:
+        lines.append(" ".join(f"{x:.4f}" for x in row))
+    Path(path).write_text("\n".join(lines), encoding="utf-8")
