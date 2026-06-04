@@ -14,7 +14,9 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QPushButton,
+    QScrollArea,
     QTabWidget,
+    QTextBrowser,
     QVBoxLayout,
     QWidget,
 )
@@ -39,7 +41,7 @@ class TeamInfoDialog(QDialog):
             }
             QLabel {
                 color: #f3f4f6;
-                font-family: 'Segoe UI', Arial, sans-serif;
+                font-family: 'Helvetica Neue', Arial, sans-serif;
             }
             QPushButton {
                 background-color: #2563eb;
@@ -61,12 +63,14 @@ class TeamInfoDialog(QDialog):
 
         title = QLabel("👥 Echipa Antigravity")
         title.setAlignment(Qt.AlignCenter)
-        title.setFont(QFont("Segoe UI", 16, QFont.Bold))
+        title.setFont(QFont("Helvetica Neue", 16, QFont.Weight.Bold))
         layout.addWidget(title)
 
         subtitle = QLabel("Disciplina: Inteligență Artificială — Anul 3, AC")
         subtitle.setAlignment(Qt.AlignCenter)
-        subtitle.setFont(QFont("Segoe UI", 11, QFont.StyleItalic))
+        font = QFont("Helvetica Neue", 11)
+        font.setItalic(True)
+        subtitle.setFont(font)
         subtitle.setStyleSheet("color: #9ca3af; margin-bottom: 15px;")
         layout.addWidget(subtitle)
 
@@ -74,7 +78,7 @@ class TeamInfoDialog(QDialog):
         members_layout.setSpacing(20)
         layout.addLayout(members_layout)
 
-        # Member 1: Andrei
+        # Member 1: Vlad
         m1_layout = QVBoxLayout()
         m1_img = QLabel()
         m1_img.setAlignment(Qt.AlignCenter)
@@ -85,18 +89,18 @@ class TeamInfoDialog(QDialog):
             )
             m1_img.setPixmap(pix)
         else:
-            m1_img.setText("[Andrei Portrait]")
+            m1_img.setText("[Vladislav Shorodok]")
             m1_img.setStyleSheet(
                 "background-color: #374151; border-radius: 55px; min-width: 110px; min-height: 110px; color: #9ca3af;"
             )
         m1_layout.addWidget(m1_img)
 
-        m1_name = QLabel("<b>Andrei Popescu</b>")
+        m1_name = QLabel("<b>Vladislav Shorodok]</b>")
         m1_name.setAlignment(Qt.AlignCenter)
-        m1_name.setFont(QFont("Segoe UI", 11))
+        m1_name.setFont(QFont("Helvetica Neue", 11))
         m1_role = QLabel("TSP Solvers & Stats")
         m1_role.setAlignment(Qt.AlignCenter)
-        m1_role.setFont(QFont("Segoe UI", 9))
+        m1_role.setFont(QFont("Helvetica Neue", 9))
         m1_role.setStyleSheet("color: #9ca3af;")
         m1_layout.addWidget(m1_name)
         m1_layout.addWidget(m1_role)
@@ -127,10 +131,46 @@ class TeamInfoDialog(QDialog):
 
         m2_name = QLabel("<b>Elena Dumitrescu</b>")
         m2_name.setAlignment(Qt.AlignCenter)
-        m2_name.setFont(QFont("Segoe UI", 11))
+        m2_name.setFont(QFont("Helvetica Neue", 11))
         m2_role = QLabel("NLP Classifiers & Lexicons")
         m2_role.setAlignment(Qt.AlignCenter)
-        m2_role.setFont(QFont("Segoe UI", 9))
+        m2_role.setFont(QFont("Helvetica Neue", 9))
+        m2_role.setStyleSheet("color: #9ca3af;")
+        m2_layout.addWidget(m2_name)
+        m2_layout.addWidget(m2_role)
+        members_layout.addLayout(m2_layout)
+
+        layout.addSpacing(15)
+
+        # Separator line
+        sep = QLabel()
+        sep.setFixedWidth(1)
+        sep.setStyleSheet("background-color: #374151;")
+        members_layout.addWidget(sep)
+
+        # Member 3: Elena
+        m2_layout = QVBoxLayout()
+        m2_img = QLabel()
+        m2_img.setAlignment(Qt.AlignCenter)
+        img_path_elena = os.path.join("data", "team", "elena.png")
+        if os.path.exists(img_path_elena):
+            pix = QPixmap(img_path_elena).scaled(
+                110, 110, Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+            m2_img.setPixmap(pix)
+        else:
+            m2_img.setText("[Elena Portrait]")
+            m2_img.setStyleSheet(
+                "background-color: #374151; border-radius: 55px; min-width: 110px; min-height: 110px; color: #9ca3af;"
+            )
+        m2_layout.addWidget(m2_img)
+
+        m2_name = QLabel("<b>Elena Dumitrescu</b>")
+        m2_name.setAlignment(Qt.AlignCenter)
+        m2_name.setFont(QFont("Helvetica Neue", 11))
+        m2_role = QLabel("NLP Classifiers & Lexicons")
+        m2_role.setAlignment(Qt.AlignCenter)
+        m2_role.setFont(QFont("Helvetica Neue", 9))
         m2_role.setStyleSheet("color: #9ca3af;")
         m2_layout.addWidget(m2_name)
         m2_layout.addWidget(m2_role)
@@ -149,7 +189,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("IA — TSP & NLP Laboratory")
+        self.setWindowTitle("Traveling Salesman Problem")
         self.resize(1200, 820)
 
         # Apply a clean, modern stylesheet to the main application elements
@@ -192,14 +232,14 @@ class MainWindow(QMainWindow):
 
         # Header Bar
         header = QHBoxLayout()
-        title_label = QLabel("<b>TSP & NLP Laboratory Dashboard</b>")
-        title_label.setFont(QFont("Segoe UI", 15, QFont.Bold))
-        title_label.setStyleSheet("color: #1e3a8a; font-family: 'Segoe UI', sans-serif;")
+        title_label = QLabel("<b>TSP & NLP Dashboard</b>")
+        title_label.setFont(QFont("Helvetica Neue", 15, QFont.Weight.Bold))
+        title_label.setStyleSheet("color: #1e3a8a; font-family: 'Helvetica Neue', Arial, sans-serif;")
         header.addWidget(title_label)
         header.addStretch()
 
         btn_team = QPushButton("👥 Informații Echipă")
-        btn_team.setFont(QFont("Segoe UI", 10, QFont.Bold))
+        btn_team.setFont(QFont("Helvetica Neue", 10, QFont.Weight.Bold))
         btn_team.setStyleSheet(
             """
             QPushButton {
@@ -225,19 +265,52 @@ class MainWindow(QMainWindow):
 
         about = QWidget()
         about_layout = QVBoxLayout(about)
+        about_layout.setContentsMargins(20, 20, 20, 20)
         info = get_machine_info()
-        about_layout.addWidget(
-            QLabel(
-                "<h3>Runtime environment</h3>"
-                f"<pre>{info.as_text()}</pre>"
-                "<p>All experiment outputs include machine metadata for reproducibility.</p>"
-                "<p><b>TSP:</b> Backtracking (BKT), Nearest Neighbor, Hill Climbing, "
-                "Simulated Annealing, Genetic Algorithm.</p>"
-                "<p><b>NLP:</b> TF-IDF pipeline with Naive Bayes, SVM, Logistic Regression, "
-                "Random Forest on English datasets.</p>"
-            )
-        )
-        about_layout.addStretch()
+        
+        browser = QTextBrowser()
+        browser.setOpenExternalLinks(False)
+        browser.setStyleSheet("""
+            QTextBrowser {
+                background-color: #1a1a2e;
+                color: #e2e8f0;
+                border: 1px solid #334155;
+                border-radius: 8px;
+                padding: 16px;
+                font-size: 13px;
+            }
+        """)
+        
+        html = """
+        <style>
+            body { font-family: Arial, sans-serif; color: #e2e8f0; }
+            h2 { color: #60a5fa; margin-bottom: 6px; }
+            .card { background: #0f172a; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; border-left: 4px solid #3b82f6; }
+            .row { display: flex; margin: 4px 0; }
+            .label { color: #94a3b8; min-width: 180px; font-weight: bold; }
+            .value { color: #f1f5f9; }
+        </style>
+        <h2>Runtime Environment</h2>
+        """
+
+        rows = [
+            ("Hostname", info.hostname),
+            ("Platform", info.platform),
+            ("Processor", info.processor),
+            ("Architecture", info.architecture),
+            ("Python Version", info.python_version),
+        ]
+        if info.cpu_count is not None:
+            rows.append(("CPU Cores (logice)", str(info.cpu_count)))
+        rows.append(("Timestamp UTC", info.timestamp_utc))
+
+        html += '<div class="card">'
+        for label, value in rows:
+            html += f'<div class="row"><span class="label">{label}:</span><span class="value">{value}</span></div>'
+        html += '</div>'
+
+        browser.setHtml(html)
+        about_layout.addWidget(browser)
         tabs.addTab(about, "Machine info")
 
         main_layout.addWidget(tabs)

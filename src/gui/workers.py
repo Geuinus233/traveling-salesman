@@ -8,6 +8,7 @@ from PySide6.QtCore import QThread, Signal
 class WorkerThread(QThread):
     finished_ok = Signal(object)
     failed = Signal(str)
+    progress = Signal(int, int)  # current, total  (total=0 means indeterminate)
 
     def __init__(self, fn, *args, **kwargs):
         super().__init__()

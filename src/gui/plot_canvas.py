@@ -18,7 +18,7 @@ class PlotCanvas(FigureCanvasQTAgg):
 
     def refresh(self):
         try:
-            self.fig.tight_layout()
+            self.fig.tight_layout(pad=1.5)
         except Exception:
             pass
         self.draw()

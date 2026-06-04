@@ -13,15 +13,18 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QProgressBar,
     QSpinBox,
     QVBoxLayout,
     QWidget,
     QFileDialog,
     QCheckBox,
     QTextEdit,
+    QTextBrowser,
     QLineEdit,
     QTabWidget,
     QScrollArea,
+    QSizePolicy,
 )
 
 from src.gui.plot_canvas import PlotCanvas
@@ -66,8 +69,9 @@ class TSPTab(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QScrollArea.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setFixedWidth(340)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setMinimumWidth(260)
+        scroll.setMaximumWidth(380)
 
         scroll_content = QWidget()
         controls = QVBoxLayout(scroll_content)
@@ -94,6 +98,8 @@ class TSPTab(QWidget):
         btn_gen_row = QHBoxLayout()
         self.btn_gen = QPushButton("Gen. Orașe (Euclidian)")
         self.btn_gen_non_eucl = QPushButton("Gen. Non-Euclidian")
+        self.btn_gen.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.btn_gen_non_eucl.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         btn_gen_row.addWidget(self.btn_gen)
         btn_gen_row.addWidget(self.btn_gen_non_eucl)
         group_data_layout.addLayout(btn_gen_row)
@@ -102,6 +108,8 @@ class TSPTab(QWidget):
         btn_file_row = QHBoxLayout()
         self.btn_load = QPushButton("Încarcă Matrică")
         self.btn_save = QPushButton("Salvează Matrică")
+        self.btn_load.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.btn_save.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         btn_file_row.addWidget(self.btn_load)
         btn_file_row.addWidget(self.btn_save)
         group_data_layout.addLayout(btn_file_row)
@@ -133,13 +141,15 @@ class TSPTab(QWidget):
         run_btn_row = QHBoxLayout()
         self.btn_run = QPushButton("Rulare Algoritm")
         self.btn_compare = QPushButton("Compară Algoritmi")
+        self.btn_run.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.btn_compare.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         run_btn_row.addWidget(self.btn_run)
         run_btn_row.addWidget(self.btn_compare)
         group_run_layout.addLayout(run_btn_row)
 
         # Benchmark Settings
         bench_form = QFormLayout()
-        self.line_sizes = QLineEdit("5, 10, 15, 20, 30, 50")
+        self.line_sizes = QLineEdit("10, 20, 50, 75, 100")
         bench_form.addRow("Dimensiuni N:", self.line_sizes)
 
         self.spin_repeats = QSpinBox()
@@ -149,22 +159,53 @@ class TSPTab(QWidget):
         group_run_layout.addLayout(bench_form)
 
         self.btn_bench = QPushButton("Rulare Benchmark Complexe")
+        self.btn_bench.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         group_run_layout.addWidget(self.btn_bench)
         controls.addWidget(group_run)
 
-        # 4. Outputs
-        self.result_text = QTextEdit()
-        self.result_text.setReadOnly(True)
-        self.result_text.setMaximumHeight(140)
-        self.result_text.setStyleSheet("font-family: Consolas, monospace; font-size: 11px;")
-        controls.addWidget(QLabel("Rezultate Consolă:"))
-        controls.addWidget(self.result_text)
-        controls.addStretch()
+        # Progress bar + status label (centered)
+        self.progress_label = QLabel("Gata.")
+        self.progress_label.setStyleSheet("color: #475569; font-size: 11px;")
+        self.progress_label.setAlignment(Qt.AlignHCenter)
+        controls.addWidget(self.progress_label, 0, Qt.AlignHCenter)
 
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setFixedHeight(20)
+        self.progress_bar.setFixedWidth(320)
+        self.progress_bar.setFormat("%p%")
+        self.progress_bar.setTextVisible(True)
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+                background: #e2e8f0;
+                text-align: center;
+                font-size: 11px;
+                font-weight: bold;
+                color: #ffffff;
+            }
+            QProgressBar::chunk {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #3b82f6, stop:1 #6366f1);
+                border-radius: 8px;
+            }
+        """)
+        controls.addWidget(self.progress_bar, 0, Qt.AlignHCenter)
+
+        controls.addStretch()
+        
         scroll.setWidget(scroll_content)
         root.addWidget(scroll, 0)
-
-        # Visualization Tabs (Right side)
+        
+        # Right Side Layout (Graphics + Display at bottom)
+        right_layout = QVBoxLayout()
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(10)
+        
+        # Visualization Tabs
         self.viz_tabs = QTabWidget()
         
         self.canvas_map = PlotCanvas()
@@ -172,12 +213,41 @@ class TSPTab(QWidget):
         self.canvas_comp = PlotCanvas()
         self.canvas_bench = PlotCanvas()
 
-        self.viz_tabs.addTab(self.canvas_map, "🗺️ Hartă și Rute")
-        self.viz_tabs.addTab(self.canvas_conv, "📈 Convergență")
-        self.viz_tabs.addTab(self.canvas_comp, "📊 Comparare Cost & Timp")
-        self.viz_tabs.addTab(self.canvas_bench, "🔬 Benchmark-uri Complexe")
+        self.viz_tabs.addTab(self.canvas_map, "Harta si Rute")
+        self.viz_tabs.addTab(self.canvas_conv, "Convergenta")
+        self.viz_tabs.addTab(self.canvas_comp, "Comparare")
+        self.viz_tabs.addTab(self.canvas_bench, "Benchmark")
+        
+        right_layout.addWidget(self.viz_tabs, 1)
 
-        root.addWidget(self.viz_tabs, 1)
+        # Hidden widgets kept for backward compat with internal calls
+        self.result_text = QTextEdit()
+        self.result_text.setVisible(False)
+        self.result_display = self.result_text  # redirect all setHtml to hidden widget
+
+        # Console — fills all remaining height below graphs
+        self.console_label = QLabel()
+        self.console_label.setWordWrap(True)
+        self.console_label.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self.console_label.setTextFormat(Qt.PlainText)
+        self.console_label.setStyleSheet(
+            "QLabel { font-family: Consolas, monospace; font-size: 12px;"
+            " padding: 8px 10px; color: #ffffff; line-height: 1.6; }"
+        )
+        self.console_label.setText("Asteapta rulare algoritm...")
+
+        console_scroll = QScrollArea()
+        console_scroll.setWidget(self.console_label)
+        console_scroll.setWidgetResizable(True)
+        console_scroll.setFrameShape(QScrollArea.NoFrame)
+        console_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        console_scroll.setStyleSheet(
+            "QScrollArea { background: #1e293b; border-top: 2px solid #334155; }"
+        )
+        right_layout.addWidget(console_scroll, 1)  # stretch=1, fills remaining space
+
+        root.addLayout(right_layout, 1)
+
 
         # Event connections
         self.btn_gen.clicked.connect(self._generate_cities)
@@ -285,17 +355,16 @@ class TSPTab(QWidget):
         self.cities = generate_cities(n, seed=self.seed_spin.value())
         self.dist_matrix = matrix_from_coords(self.cities)
         self._draw_path([], "Orașe generate (Euclidian)")
-        self.result_text.setPlainText(f"Generate {n} orașe în coordonate 2D (Euclidian).")
+        msg = f"Generate {n} orașe în coordonate 2D (Euclidian)."
+        self.result_text.setPlainText(msg); self.console_label.setText(msg)
 
     def _generate_non_euclidian(self):
         n = self.spin_n.value()
         self.dist_matrix = random_matrix(n, seed=self.seed_spin.value())
         self._layout_cities_circle(n)
-        self._draw_path([], f"Generat matrică non-Euclidiană N={n}")
-        self.result_text.setPlainText(
-            f"Generat matrică non-Euclidiană de dimensiune {n}x{n}.\n"
-            "Notă: Orașele sunt dispuse circular pentru vizualizare."
-        )
+        self._draw_path([], f"Generat matrice non-Euclidiană N={n}")
+        msg = f"Generat matrice non-Euclidiană de dimensiune {n}x{n}.\nNotă: Orașele sunt dispuse circular pentru vizualizare."
+        self.result_text.setPlainText(msg); self.console_label.setText(msg)
 
     def _layout_cities_circle(self, n: int):
         self.cities = []
@@ -304,25 +373,30 @@ class TSPTab(QWidget):
             self.cities.append((400.0 + 220.0 * math.cos(angle), 300.0 + 220.0 * math.sin(angle)))
 
     def _load_file(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Deschide matrică TSP", "", "Text (*.txt);;All (*)")
+        path, _ = QFileDialog.getOpenFileName(self, "Deschide matrice TSP", "", "Text (*.txt);;All (*)")
         if not path:
             return
         n, matrix = load_matrix_file(path)
         self.dist_matrix = matrix
         self._layout_cities_circle(n)
         self.spin_n.setValue(n)
-        self._draw_path([], f"Încărcat matrică N={n}")
-        self.result_text.setPlainText(f"Încărcat fișierul: {path}\nDimensiune N={n}.")
+        self._draw_path([], f"Încărcat matrice N={n}")
+        fname = os.path.basename(path)
+        msg = f"Încărcat fișierul: {fname}\nDimensiune: N = {n} orașe"
+        self.result_text.setPlainText(msg); self.console_label.setText(msg)
 
     def _save_file(self):
         if not self.dist_matrix:
-            self.result_text.setPlainText("Nu există nicio matrică de salvat!")
+            msg = "Nu exista nicio matrice de salvat!"
+            self.result_text.setPlainText(msg); self.console_label.setText(msg)
             return
-        path, _ = QFileDialog.getSaveFileName(self, "Salvează matrică TSP", "", "Text (*.txt);;All (*)")
+        path, _ = QFileDialog.getSaveFileName(self, "Salvează matrice TSP", "", "Text (*.txt);;All (*)")
         if not path:
             return
         save_matrix_file(path, self.dist_matrix)
-        self.result_text.setPlainText(f"Salvare finalizată cu succes la:\n{path}")
+        fname = os.path.basename(path)
+        msg = f"Salvat cu succes: {fname}"
+        self.result_text.setPlainText(msg); self.console_label.setText(msg)
 
     def _draw_path(self, path: list[int], title: str):
         self.canvas_map.clear()
@@ -350,50 +424,78 @@ class TSPTab(QWidget):
         self.btn_gen_non_eucl.setEnabled(not busy)
         self.btn_load.setEnabled(not busy)
         self.btn_save.setEnabled(not busy)
+        if not busy:
+            self.progress_bar.setVisible(False)
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(0)
+            self.progress_label.setText("Gata.")
+
+    def _on_progress(self, current: int, total: int):
+        if total == 0:
+            # Indeterminate — animated bar, no percentage
+            self.progress_bar.setRange(0, 0)
+            self.progress_bar.setFormat("Se ruleaza...")
+            self.progress_label.setText("Se ruleaza...")
+        else:
+            pct = int(current / total * 100)
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(pct)
+            self.progress_bar.setFormat(f"{pct}%")
+            self.progress_label.setText(f"Pas {current} / {total}  ({pct}%)")
 
     def _run_async(self, fn, on_ok):
         if self._worker and self._worker.isRunning():
             return
         self._set_busy(True)
+        self.progress_bar.setVisible(True)
         self._worker = WorkerThread(fn)
         self._worker.finished_ok.connect(on_ok)
         self._worker.failed.connect(self._on_error)
+        self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(lambda: self._set_busy(False))
         self._worker.start()
 
     def _on_error(self, msg: str):
-        self.result_text.setPlainText(f"Eroare: {msg}")
+        err = f"Eroare: {msg}"
+        self.result_text.setPlainText(err); self.console_label.setText(err)
 
     def _run_single(self):
         if not self.dist_matrix:
             return
         algo = self.algo_combo.currentText()
-        if algo == "BKT" and len(self.dist_matrix) > 12:
-            self.result_text.setPlainText("BKT este limitat la N ≤ 12 în interfața grafică.")
-            return
         params = self._current_params(algo)
         matrix = self.dist_matrix
 
         def job():
+            # Indeterminate — we don't know exact duration
             return algo, SOLVERS[algo](matrix, params)
 
         def done(payload):
             algo_name, result = payload
             self._show_result(algo_name, result)
 
+        self._on_progress(0, 0)  # Start indeterminate
         self._run_async(job, done)
 
     def _show_result(self, algo: str, result: TSPResult):
-        machine = get_machine_info().as_text()
-        text = (
+        # Format route as: 0 -> 3 -> 7 -> ... -> 0
+        if result.path:
+            route_str = " -> ".join(str(c) for c in result.path) + f" -> {result.path[0]}"
+        else:
+            route_str = "N/A"
+        
+        meta_parts = [f"{k}: {v}" for k, v in result.meta.items() if k != "history"]
+        meta_str = "  |  ".join(meta_parts)
+        
+        # Plain text for console
+        console_text = (
             f"Algoritm: {algo}\n"
-            f"Cost: {result.cost:.4f}\n"
-            f"Timp: {result.elapsed_s:.5f} s\n"
-            f"Ruta: {format_tour(result.path)}\n"
-            f"Meta: {result.meta}\n\n"
-            f"--- Dispozitiv ---\n{machine}"
+            f"Cost:     {result.cost:.4f}\n"
+            f"Timp:     {result.elapsed_s:.5f} s\n"
+            f"Rută:     {route_str}\n"
+            f"Meta:     {meta_str}"
         )
-        self.result_text.setPlainText(text)
+        self.result_text.setPlainText(console_text); self.console_label.setText(console_text)
         self._draw_path(result.path, f"{algo} — cost {result.cost:.2f}")
 
         # Draw convergence plot if history is available (SA, GA, HC)
@@ -402,11 +504,17 @@ class TSPTab(QWidget):
             self.canvas_conv.clear()
             ax = self.canvas_conv.ax
             ax.plot(range(len(history)), history, color="crimson", linewidth=2.0, label="Cost curent")
-            ax.set_title(f"Convergența Istorică - {algo}")
+            ax.set_title(f"Convergență - {algo}")
             ax.set_xlabel("Eșantion Iterații / Generații")
             ax.set_ylabel("Cel mai bun cost")
             ax.grid(True, linestyle="--", alpha=0.5)
             ax.legend()
+            self.canvas_conv.refresh()
+            # Switch to the convergence tab automatically
+            self.viz_tabs.setCurrentIndex(1)
+        else:
+            self.canvas_conv.clear()
+            self.canvas_conv.ax.set_title("Nicio convergență (doar pentru SA, GA, HC)")
             self.canvas_conv.refresh()
 
     def _run_compare(self):
@@ -415,18 +523,27 @@ class TSPTab(QWidget):
         matrix = self.dist_matrix
         n = len(matrix)
 
+        algos_to_run = [
+            (algo, fn) for algo, fn in SOLVERS.items()
+            if not (algo == "BKT" and n > 20)
+        ]
+        total = len(algos_to_run)
+
+        # mutable counter accessible from worker thread via closure
+        counter = [0]
+
         def job():
             rows = []
-            for algo, fn in SOLVERS.items():
-                if algo == "BKT" and n > 12:
-                    continue
+            for i, (algo, fn) in enumerate(algos_to_run):
                 params = None
                 if algo == "NN":
                     params = NNParams(multistart=True)
                 elif algo == "BKT":
-                    params = BKTParams(mode="exhaustiv" if n <= 10 else "timp", time_limit_s=5.0)
+                    params = BKTParams(mode="timp", time_limit_s=5.0)
                 r = fn(matrix, params) if params else fn(matrix)
                 rows.append((algo, r))
+                counter[0] = i + 1
+                self._worker.progress.emit(i + 1, total)
             return rows
 
         def done(rows):
@@ -465,9 +582,15 @@ class TSPTab(QWidget):
             self.canvas_comp.refresh()
             self.viz_tabs.setCurrentIndex(2)  # Switch to Comparison Tab
 
-            lines = [f"{a}: cost={r.cost:.2f}, timp={r.elapsed_s:.5f}s" for a, r in rows]
-            lines.append("\n" + get_machine_info().as_text())
-            self.result_text.setPlainText("\n".join(lines))
+            best_algo = min(rows, key=lambda t: t[1].cost)[0]
+
+            # Plain console text
+            console_lines = [f"Comparare Algoritmi (N={n}):", "-" * 40]
+            for a, r in rows:
+                best_mark = " [CEL MAI BUN]" if a == best_algo else ""
+                console_lines.append(f"{a:<6}  cost={r.cost:.2f}  timp={r.elapsed_s:.5f}s{best_mark}")
+            self.result_text.setPlainText("\n".join(console_lines))
+            self.console_label.setText("\n".join(console_lines))
             best = min(rows, key=lambda t: t[1].cost)
             self._draw_path(best[1].path, f"Cel mai bun: {best[0]}")
 
@@ -475,17 +598,30 @@ class TSPTab(QWidget):
 
     def _run_benchmark(self):
         try:
-            # Parse sizes e.g. "5,10,15,20,30,50"
             sizes = [int(s.strip()) for s in self.line_sizes.text().split(",") if s.strip()]
         except Exception:
-            self.result_text.setPlainText("Format dimensiuni invalid! Folosește valori separate prin virgulă.")
+            msg = "Format dimensiuni invalid! Foloseste valori separate prin virgula."
+            self.result_text.setPlainText(msg); self.console_label.setText(msg)
             return
 
         repeats = self.spin_repeats.value()
         seed = self.seed_spin.value()
 
+        # ~5 algos per N (BKT only for small N, but approximate is fine for display)
+        total_steps = 5 * len(sizes)
+
         def job():
-            return run_tsp_benchmark(sizes=sizes, repeats=repeats, seed=seed)
+            from src.tsp.benchmarks import run_tsp_benchmark as _bench
+            # Run using the official benchmark function (correct random_matrix + params)
+            # We wrap it to emit progress after each completed (n, algo) pair
+            step = [0]
+            all_rows = []
+            for n in sizes:
+                partial = _bench(sizes=[n], repeats=repeats, seed=seed)
+                all_rows.extend(partial)
+                step[0] += len(partial)  # one row per algo per n
+                self._worker.progress.emit(step[0], total_steps)
+            return all_rows
 
         def done(rows):
             self.canvas_bench.clear()
@@ -527,16 +663,27 @@ class TSPTab(QWidget):
             self.canvas_bench.refresh()
             self.viz_tabs.setCurrentIndex(3)  # Switch to Benchmark Tab
 
-            console_output = [
-                f"Benchmark finalizat pe {get_machine_info().hostname} (repetări={repeats}):",
-                "-" * 65,
-                f"{'Algoritm':<12} {'N':<6} {'Cost Mediu':<12} {'Timp Mediu (s)':<14}",
-                "-" * 65
+            algos_sorted = sorted({r.algorithm for r in rows})
+            sizes_sorted = sorted({r.n for r in rows})
+
+            # Plain console text
+            console_lines = [
+                f"Benchmark finalizat (repetări={repeats}):",
+                f"{'Algoritm':<8}" + "".join(f" {'N='+str(n):<12}" for n in sizes_sorted),
+                "-" * (8 + 12 * len(sizes_sorted))
             ]
-            for r in rows:
-                console_output.append(
-                    f"{r.algorithm:<12} {r.n:<6} {r.cost_mean:<12.2f} {r.time_mean:<14.5f}"
-                )
-            self.result_text.setPlainText("\n".join(console_output))
+            for algo in algos_sorted:
+                algo_rows = {r.n: r for r in rows if r.algorithm == algo}
+                line = f"{algo:<8}"
+                for n in sizes_sorted:
+                    if n in algo_rows:
+                        r = algo_rows[n]
+                        line += f" {r.cost_mean:.1f}/{r.time_mean:.3f}s  "
+                    else:
+                        line += " -           "
+                console_lines.append(line)
+            self.result_text.setPlainText("\n".join(console_lines)); self.console_label.setText("\n".join(console_lines))
+
+            # console_label already updated with plain text above
 
         self._run_async(job, done)
