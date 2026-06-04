@@ -32,7 +32,7 @@ class TeamInfoDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Informații Echipă")
-        self.setFixedSize(520, 360)
+        self.setFixedSize(560, 360)
         self.setStyleSheet(
             """
             QDialog {
@@ -61,12 +61,12 @@ class TeamInfoDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(25, 25, 25, 25)
 
-        title = QLabel("👥 Echipa Antigravity")
+        title = QLabel("👥 Echipa A.V.G.")
         title.setAlignment(Qt.AlignCenter)
         title.setFont(QFont("Helvetica Neue", 16, QFont.Weight.Bold))
         layout.addWidget(title)
 
-        subtitle = QLabel("Disciplina: Inteligență Artificială — Anul 3, AC")
+        subtitle = QLabel("Disciplina: Inteligență Artificială — Anul 3, Calculatoare")
         subtitle.setAlignment(Qt.AlignCenter)
         font = QFont("Helvetica Neue", 11)
         font.setItalic(True)
@@ -82,7 +82,7 @@ class TeamInfoDialog(QDialog):
         m1_layout = QVBoxLayout()
         m1_img = QLabel()
         m1_img.setAlignment(Qt.AlignCenter)
-        img_path_andrei = os.path.join("data", "team", "andrei.png")
+        img_path_andrei = os.path.join("data", "team", "Vlad.png")
         if os.path.exists(img_path_andrei):
             pix = QPixmap(img_path_andrei).scaled(
                 110, 110, Qt.KeepAspectRatio, Qt.SmoothTransformation
@@ -95,10 +95,10 @@ class TeamInfoDialog(QDialog):
             )
         m1_layout.addWidget(m1_img)
 
-        m1_name = QLabel("<b>Vladislav Shorodok]</b>")
+        m1_name = QLabel("<b>Vladislav Shorodok</b>")
         m1_name.setAlignment(Qt.AlignCenter)
         m1_name.setFont(QFont("Helvetica Neue", 11))
-        m1_role = QLabel("TSP Solvers & Stats")
+        m1_role = QLabel("Implementare TSP")
         m1_role.setAlignment(Qt.AlignCenter)
         m1_role.setFont(QFont("Helvetica Neue", 9))
         m1_role.setStyleSheet("color: #9ca3af;")
@@ -107,32 +107,29 @@ class TeamInfoDialog(QDialog):
         members_layout.addLayout(m1_layout)
 
         # Separator line
-        sep = QLabel()
-        sep.setFixedWidth(1)
-        sep.setStyleSheet("background-color: #374151;")
-        members_layout.addWidget(sep)
+        
 
-        # Member 2: Elena
+        # Member 2: Unhurian
         m2_layout = QVBoxLayout()
         m2_img = QLabel()
         m2_img.setAlignment(Qt.AlignCenter)
-        img_path_elena = os.path.join("data", "team", "elena.png")
-        if os.path.exists(img_path_elena):
-            pix = QPixmap(img_path_elena).scaled(
+        img_path_unhurian = os.path.join("data", "team", "Gheo.jpg")
+        if os.path.exists(img_path_unhurian):
+            pix = QPixmap(img_path_unhurian).scaled(
                 110, 110, Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
             m2_img.setPixmap(pix)
         else:
-            m2_img.setText("[Elena Portrait]")
+            m2_img.setText("Unhurian Heorhii")
             m2_img.setStyleSheet(
                 "background-color: #374151; border-radius: 55px; min-width: 110px; min-height: 110px; color: #9ca3af;"
             )
         m2_layout.addWidget(m2_img)
 
-        m2_name = QLabel("<b>Elena Dumitrescu</b>")
+        m2_name = QLabel("<b>Unhurian Heorhii</b>")
         m2_name.setAlignment(Qt.AlignCenter)
         m2_name.setFont(QFont("Helvetica Neue", 11))
-        m2_role = QLabel("NLP Classifiers & Lexicons")
+        m2_role = QLabel("Implementare GUI")
         m2_role.setAlignment(Qt.AlignCenter)
         m2_role.setFont(QFont("Helvetica Neue", 9))
         m2_role.setStyleSheet("color: #9ca3af;")
@@ -143,32 +140,29 @@ class TeamInfoDialog(QDialog):
         layout.addSpacing(15)
 
         # Separator line
-        sep = QLabel()
-        sep.setFixedWidth(1)
-        sep.setStyleSheet("background-color: #374151;")
-        members_layout.addWidget(sep)
+        
 
-        # Member 3: Elena
+        # Member 3: Tovarovskiy
         m2_layout = QVBoxLayout()
         m2_img = QLabel()
         m2_img.setAlignment(Qt.AlignCenter)
-        img_path_elena = os.path.join("data", "team", "elena.png")
+        img_path_elena = os.path.join("data", "team", "Sasha.jpeg")
         if os.path.exists(img_path_elena):
             pix = QPixmap(img_path_elena).scaled(
                 110, 110, Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
             m2_img.setPixmap(pix)
         else:
-            m2_img.setText("[Elena Portrait]")
+            m2_img.setText("[Tovarovskiy Oleksandr]")
             m2_img.setStyleSheet(
                 "background-color: #374151; border-radius: 55px; min-width: 110px; min-height: 110px; color: #9ca3af;"
             )
         m2_layout.addWidget(m2_img)
 
-        m2_name = QLabel("<b>Elena Dumitrescu</b>")
+        m2_name = QLabel("<b>Tovarovskiy Oleksandr</b>")
         m2_name.setAlignment(Qt.AlignCenter)
         m2_name.setFont(QFont("Helvetica Neue", 11))
-        m2_role = QLabel("NLP Classifiers & Lexicons")
+        m2_role = QLabel("Implementare NLP")
         m2_role.setAlignment(Qt.AlignCenter)
         m2_role.setFont(QFont("Helvetica Neue", 9))
         m2_role.setStyleSheet("color: #9ca3af;")
